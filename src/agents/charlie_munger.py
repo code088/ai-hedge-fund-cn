@@ -1,5 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items, get_insider_trades, get_company_news
+from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items, get_insider_trades, get_company_news
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
@@ -168,7 +168,7 @@ def analyze_moat_strength(metrics: list, financial_line_items: list) -> dict:
     score = 0
     details = []
     
-    if not metrics or not financial_line_items:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
         return {
             "score": 0,
             "details": "Insufficient data to analyze moat strength"

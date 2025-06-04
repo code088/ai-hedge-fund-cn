@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 import json
 from typing_extensions import Literal
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items
 from src.utils.llm import call_llm
 from src.utils.progress import progress
 
@@ -153,7 +153,7 @@ def warren_buffett_agent(state: AgentState):
 
 def analyze_fundamentals(metrics: list) -> dict[str, any]:
     """Analyze company fundamentals based on Buffett's criteria."""
-    if not metrics:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or len(metrics) == 0:
         return {"score": 0, "details": "Insufficient fundamental data"}
 
     latest_metrics = metrics[0]
@@ -243,7 +243,7 @@ def analyze_moat(metrics: list) -> dict[str, any]:
     4. Brand strength (inferred from margins and consistency)
     5. Switching costs (inferred from customer retention)
     """
-    if not metrics or len(metrics) < 5:  # Need more data for proper moat analysis
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or len(metrics) < 5:  # Need more data for proper moat analysis
         return {"score": 0, "max_score": 5, "details": "Insufficient data for comprehensive moat analysis"}
 
     reasoning = []

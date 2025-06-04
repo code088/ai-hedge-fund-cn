@@ -8,7 +8,7 @@ import json
 import pandas as pd
 import numpy as np
 
-from src.tools.api import get_prices, prices_to_df
+from src.tools.api_router import get_prices, prices_to_df
 from src.utils.progress import progress
 
 

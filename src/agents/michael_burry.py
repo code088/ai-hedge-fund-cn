@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
-from src.tools.api import (
+from src.tools.api_router import (
     get_company_news,
     get_financial_metrics,
     get_insider_trades,

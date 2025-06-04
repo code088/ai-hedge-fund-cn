@@ -1,5 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
@@ -108,18 +108,18 @@ def cathie_wood_agent(state: AgentState):
 
 def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> dict:
     """
-    Analyze whether the company has disruptive products, technology, or business model.
-    Evaluates multiple dimensions of disruptive potential:
-    1. Revenue Growth Acceleration - indicates market adoption
-    2. R&D Intensity - shows innovation investment
-    3. Gross Margin Trends - suggests pricing power and scalability
-    4. Operating Leverage - demonstrates business model efficiency
-    5. Market Share Dynamics - indicates competitive position
+    Evaluate the company's potential for disruptive innovation.
+    Analyzes multiple dimensions:
+    1. Revenue Growth Acceleration - indicates market disruption
+    2. Gross Margin Trends - suggests pricing power and scalability
+    3. Operating Leverage - demonstrates business model efficiency
+    4. Market Share Dynamics - indicates competitive position
+    5. R&D Investment - measures commitment to innovation
     """
     score = 0
     details = []
 
-    if not metrics or not financial_line_items:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
         return {"score": 0, "details": "Insufficient data to analyze disruptive potential"}
 
     # 1. Revenue Growth Analysis - Check for accelerating growth
@@ -218,7 +218,7 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     score = 0
     details = []
 
-    if not metrics or not financial_line_items:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
         return {"score": 0, "details": "Insufficient data to analyze innovation-driven growth"}
 
     # 1. R&D Investment Trends

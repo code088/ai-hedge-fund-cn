@@ -3,7 +3,7 @@ from src.graph.state import AgentState, show_agent_reasoning
 from src.utils.progress import progress
 import json
 
-from src.tools.api import get_financial_metrics
+from src.tools.api_router import get_financial_metrics
 
 
 ##### Fundamental Agent #####
@@ -27,7 +27,7 @@ def fundamentals_analyst_agent(state: AgentState):
             limit=10,
         )
 
-        if not financial_metrics:
+        if financial_metrics is None or financial_metrics.empty:
             progress.update_status("fundamentals_analyst_agent", ticker, "Failed: No financial metrics found")
             continue
 

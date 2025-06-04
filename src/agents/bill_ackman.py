@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from src.graph.state import AgentState, show_agent_reasoning
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
@@ -67,7 +67,7 @@ def bill_ackman_agent(state: AgentState):
         activism_analysis = analyze_activism_potential(financial_line_items)
         
         progress.update_status("bill_ackman_agent", ticker, "Calculating intrinsic value & margin of safety")
-        valuation_analysis = analyze_valuation(financial_line_items, market_cap)
+        valuation_analysis = analyze_valuation(metrics, financial_line_items, market_cap)
         
         # Combine partial scores or signals
         total_score = (
@@ -133,20 +133,13 @@ def bill_ackman_agent(state: AgentState):
     }
 
 
-def analyze_business_quality(metrics: list, financial_line_items: list) -> dict:
-    """
-    Analyze whether the company has a high-quality business with stable or growing cash flows,
-    durable competitive advantages (moats), and potential for long-term growth.
-    Also tries to infer brand strength if intangible_assets data is present (optional).
-    """
+def analyze_business_quality(metrics: list, financial_line_items: list) -> dict[str, any]:
+    """Analyze business quality using Bill Ackman's criteria."""
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
+        return {"score": 0, "max_score": 3, "details": "Insufficient data for business quality analysis"}
+    
     score = 0
     details = []
-    
-    if not metrics or not financial_line_items:
-        return {
-            "score": 0,
-            "details": "Insufficient data to analyze business quality"
-        }
     
     # 1. Multi-period revenue growth analysis
     revenues = [item.revenue for item in financial_line_items if item.revenue is not None]
@@ -207,6 +200,7 @@ def analyze_business_quality(metrics: list, financial_line_items: list) -> dict:
     
     return {
         "score": score,
+        "max_score": 3,
         "details": "; ".join(details)
     }
 
@@ -220,7 +214,7 @@ def analyze_financial_discipline(metrics: list, financial_line_items: list) -> d
     score = 0
     details = []
     
-    if not metrics or not financial_line_items:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
         return {
             "score": 0,
             "details": "Insufficient data to analyze financial discipline"
@@ -331,16 +325,10 @@ def analyze_activism_potential(financial_line_items: list) -> dict:
     return {"score": score, "details": "; ".join(details)}
 
 
-def analyze_valuation(financial_line_items: list, market_cap: float) -> dict:
-    """
-    Ackman invests in companies trading at a discount to intrinsic value.
-    Uses a simplified DCF with FCF as a proxy, plus margin of safety analysis.
-    """
-    if not financial_line_items or market_cap is None:
-        return {
-            "score": 0,
-            "details": "Insufficient data to perform valuation"
-        }
+def analyze_valuation(metrics: list, financial_line_items: list, market_cap: float) -> dict[str, any]:
+    """Analyze valuation using Bill Ackman's criteria."""
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
+        return {"score": 0, "max_score": 3, "details": "Insufficient data for valuation analysis"}
     
     # Since financial_line_items are in descending order (newest first),
     # the most recent period is the first element
@@ -389,6 +377,7 @@ def analyze_valuation(financial_line_items: list, market_cap: float) -> dict:
     
     return {
         "score": score,
+        "max_score": 3,
         "details": "; ".join(details),
         "intrinsic_value": intrinsic_value,
         "margin_of_safety": margin_of_safety

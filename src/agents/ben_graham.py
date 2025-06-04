@@ -1,5 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
@@ -46,7 +46,7 @@ def ben_graham_agent(state: AgentState):
         earnings_analysis = analyze_earnings_stability(metrics, financial_line_items)
 
         progress.update_status("ben_graham_agent", ticker, "Analyzing financial strength")
-        strength_analysis = analyze_financial_strength(financial_line_items)
+        strength_analysis = analyze_financial_strength(metrics, financial_line_items)
 
         progress.update_status("ben_graham_agent", ticker, "Analyzing Graham valuation")
         valuation_analysis = analyze_valuation_graham(financial_line_items, market_cap)
@@ -102,7 +102,7 @@ def analyze_earnings_stability(metrics: list, financial_line_items: list) -> dic
     score = 0
     details = []
 
-    if not metrics or not financial_line_items:
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
         return {"score": score, "details": "Insufficient data for earnings stability analysis"}
 
     eps_vals = []
@@ -136,16 +136,13 @@ def analyze_earnings_stability(metrics: list, financial_line_items: list) -> dic
     return {"score": score, "details": "; ".join(details)}
 
 
-def analyze_financial_strength(financial_line_items: list) -> dict:
-    """
-    Graham checks liquidity (current ratio >= 2), manageable debt,
-    and dividend record (preferably some history of dividends).
-    """
+def analyze_financial_strength(metrics: list, financial_line_items: list) -> dict[str, any]:
+    """Analyze financial strength using Ben Graham's criteria."""
+    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
+        return {"score": 0, "max_score": 3, "details": "Insufficient data for financial strength analysis"}
+
     score = 0
     details = []
-
-    if not financial_line_items:
-        return {"score": score, "details": "No data for financial strength analysis"}
 
     latest_item = financial_line_items[0]
     total_assets = latest_item.total_assets or 0
@@ -199,7 +196,7 @@ def analyze_financial_strength(financial_line_items: list) -> dict:
     else:
         details.append("No dividend data available to assess payout consistency.")
 
-    return {"score": score, "details": "; ".join(details)}
+    return {"score": score, "max_score": 3, "details": "; ".join(details)}
 
 
 def analyze_valuation_graham(financial_line_items: list, market_cap: float) -> dict:
