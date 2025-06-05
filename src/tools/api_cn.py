@@ -104,226 +104,145 @@ def get_prices(ticker: str, start_date: str, end_date: str) -> list[Price]:
         print(f"Error fetching prices for {ticker}: {str(e)}")
         return []
 
-def get_financial_metrics(ticker: str, end_date: str, period: str = "annual", limit: int = 5) -> pd.DataFrame:
-    """Get financial metrics for a Chinese stock"""
-    try:
-        # Convert ticker format (e.g., 600519.SH -> 600519)
-        stock_code = ticker.split('.')[0]
-        
-        # Get financial reports from Akshare using Eastmoney APIs
-        income_statement = ak.stock_profit_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        balance_sheet = ak.stock_balance_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        cash_flow = ak.stock_cash_flow_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        print("[DEBUG] income_statement columns:", income_statement.columns)
-        print("[DEBUG] income_statement head:\n", income_statement.head())
-        print("[DEBUG] balance_sheet columns:", balance_sheet.columns)
-        print("[DEBUG] balance_sheet head:\n", balance_sheet.head())
-        print("[DEBUG] cash_flow columns:", cash_flow.columns)
-        print("[DEBUG] cash_flow head:\n", cash_flow.head())
-        
-        if income_statement.empty or balance_sheet.empty or cash_flow.empty:
-            return pd.DataFrame()
-            
-        # Get market cap
-        market_data = ak.stock_zh_a_spot_em()
-        stock_info = market_data[market_data['代码'] == stock_code]
-        market_cap = float(stock_info['总市值'].iloc[0]) if not stock_info.empty else None
-        
-        # Get latest data
-        latest_income = income_statement.iloc[0]
-        latest_balance = balance_sheet.iloc[0]
-        latest_cash = cash_flow.iloc[0]
-        
-        # 打印所有可用的字段名，帮助调试
-        print("\n[DEBUG] Available fields in income statement:", list(income_statement.columns))
-        print("[DEBUG] Available fields in balance sheet:", list(balance_sheet.columns))
-        print("[DEBUG] Available fields in cash flow:", list(cash_flow.columns))
-        
-        # 自动识别字段名
-        sales_field = find_matching_field(income_statement, 'TOTAL_OPERATE_INCOME')
-        net_profit_field = find_matching_field(income_statement, 'NETPROFIT')
-        total_assets_field = find_matching_field(balance_sheet, 'TOTAL_ASSETS')
-        total_equity_field = find_matching_field(balance_sheet, 'TOTAL_EQUITY')
-        net_operate_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_OPERATE')
-        net_invest_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_INVEST')
-        net_finance_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_FINANCE')
-        basic_eps_field = find_matching_field(income_statement, 'BASIC_EPS')
-        share_capital_field = find_matching_field(balance_sheet, 'SHARE_CAPITAL')
-        dividend_per_share_field = find_matching_field(income_statement, 'DIVIDEND_PER_SHARE')
-        operating_cost_field = find_matching_field(income_statement, 'TOTAL_OPERATE_COST')
-        inventory_field = find_matching_field(balance_sheet, 'INVENTORY')
-        accounts_receivable_field = find_matching_field(balance_sheet, 'ACCOUNTS_RECE')
-        accounts_payable_field = find_matching_field(balance_sheet, 'ACCOUNTS_PAYABLE')
-        operating_profit_field = find_matching_field(income_statement, 'OPERATE_PROFIT')
-        financial_expense_field = find_matching_field(income_statement, 'FINANCE_EXPENSE')
-        fixed_assets_field = find_matching_field(balance_sheet, 'FIXED_ASSET')
-        total_current_assets_field = find_matching_field(balance_sheet, 'TOTAL_CURRENT_ASSETS')
-        total_current_liabilities_field = find_matching_field(balance_sheet, 'TOTAL_CURRENT_LIAB')
-        retained_earnings_field = find_matching_field(balance_sheet, 'UNASSIGN_RPOFIT')
-        fixed_assets_purchase_field = find_matching_field(cash_flow, 'CONSTRUCT_LONG_ASSET')
-        depreciation_field = find_matching_field(income_statement, 'FA_IR_DEPR')
-        
-        print("\n[DEBUG] Field mappings:")
-        print(f"sales_field: {sales_field}")
-        print(f"net_profit_field: {net_profit_field}")
-        print(f"total_assets_field: {total_assets_field}")
-        print(f"total_equity_field: {total_equity_field}")
-        
-        # Map indicators to metrics
-        metrics = {
-            'revenue': float(latest_income[sales_field]) if sales_field in latest_income else None,
-            'net_income': float(latest_income[net_profit_field]) if net_profit_field in latest_income else None,
-            'total_assets': float(latest_balance[total_assets_field]) if total_assets_field in latest_balance else None,
-            'total_equity': float(latest_balance[total_equity_field]) if total_equity_field in latest_balance else None,
-            'market_cap': market_cap,
-            'pe_ratio': market_cap / float(latest_income[net_profit_field]) if market_cap and net_profit_field in latest_income and float(latest_income[net_profit_field]) > 0 else None,
-            'return_on_equity': float(latest_income[net_profit_field]) / float(latest_balance[total_equity_field]) if net_profit_field in latest_income and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'operating_cash_flow': float(latest_cash[net_operate_cash_flow_field]) if net_operate_cash_flow_field in latest_cash else None,
-            'investing_cash_flow': float(latest_cash[net_invest_cash_flow_field]) if net_invest_cash_flow_field in latest_cash else None,
-            'financing_cash_flow': float(latest_cash[net_finance_cash_flow_field]) if net_finance_cash_flow_field in latest_cash else None,
-            'free_cash_flow': float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field]) if net_operate_cash_flow_field in latest_cash and net_invest_cash_flow_field in latest_cash else None,
-            'eps': float(latest_income[basic_eps_field]) if basic_eps_field in latest_income else None,
-            'book_value': float(latest_balance[total_equity_field]) / float(latest_balance[share_capital_field]) if total_equity_field in latest_balance and share_capital_field in latest_balance and float(latest_balance[share_capital_field]) > 0 else None,
-            'pb_ratio': market_cap / (float(latest_balance[total_equity_field]) / float(latest_balance[share_capital_field])) if market_cap and total_equity_field in latest_balance and share_capital_field in latest_balance and float(latest_balance[share_capital_field]) > 0 else None,
-            'dividend_yield': float(latest_income[dividend_per_share_field]) / float(latest_income[basic_eps_field]) if dividend_per_share_field in latest_income and basic_eps_field in latest_income and float(latest_income[basic_eps_field]) > 0 else None,
-            'asset_turnover': float(latest_income[sales_field]) / float(latest_balance[total_assets_field]) if sales_field in latest_income and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'inventory_turnover': float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field]) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else None,
-            'receivables_turnover': float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field]) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else None,
-            'days_sales_outstanding': 365 / (float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field])) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else None,
-            'days_inventory': 365 / (float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field])) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else None,
-            'days_payable': 365 / (float(latest_income[operating_cost_field]) / float(latest_balance[accounts_payable_field])) if operating_cost_field in latest_income and accounts_payable_field in latest_balance and float(latest_balance[accounts_payable_field]) > 0 else None,
-            'cash_conversion_cycle': (365 / (float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field])) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else 0) + 
-                                   (365 / (float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field])) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else 0) - 
-                                   (365 / (float(latest_income[operating_cost_field]) / float(latest_balance[accounts_payable_field])) if operating_cost_field in latest_income and accounts_payable_field in latest_balance and float(latest_balance[accounts_payable_field]) > 0 else 0),
-            'interest_coverage': float(latest_income[operating_profit_field]) / float(latest_income[financial_expense_field]) if operating_profit_field in latest_income and financial_expense_field in latest_income and float(latest_income[financial_expense_field]) > 0 else None,
-            'fixed_asset_turnover': float(latest_income[sales_field]) / float(latest_balance[fixed_assets_field]) if sales_field in latest_income and fixed_assets_field in latest_balance and float(latest_balance[fixed_assets_field]) > 0 else None,
-            'total_asset_turnover': float(latest_income[sales_field]) / float(latest_balance[total_assets_field]) if sales_field in latest_income and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'equity_turnover': float(latest_income[sales_field]) / float(latest_balance[total_equity_field]) if sales_field in latest_income and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'working_capital': float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field]) if total_current_assets_field in latest_balance and total_current_liabilities_field in latest_balance else None,
-            'working_capital_turnover': float(latest_income[sales_field]) / (float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field])) if sales_field in latest_income and total_current_assets_field in latest_balance and total_current_liabilities_field in latest_balance and (float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field])) > 0 else None,
-            'retained_earnings': float(latest_balance[retained_earnings_field]) if retained_earnings_field in latest_balance else None,
-            'retained_earnings_to_equity': float(latest_balance[retained_earnings_field]) / float(latest_balance[total_equity_field]) if retained_earnings_field in latest_balance and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'capital_expenditure': float(latest_cash[fixed_assets_purchase_field]) if fixed_assets_purchase_field in latest_cash else None,
-            'capital_expenditure_to_operating_cash_flow': float(latest_cash[fixed_assets_purchase_field]) / float(latest_cash[net_operate_cash_flow_field]) if fixed_assets_purchase_field in latest_cash and net_operate_cash_flow_field in latest_cash and float(latest_cash[net_operate_cash_flow_field]) > 0 else None,
-            'capital_expenditure_to_depreciation': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[depreciation_field]) if fixed_assets_purchase_field in latest_cash and depreciation_field in latest_income and float(latest_income[depreciation_field]) > 0 else None,
-            'capital_expenditure_to_revenue': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[sales_field]) if fixed_assets_purchase_field in latest_cash and sales_field in latest_income and float(latest_income[sales_field]) > 0 else None,
-            'capital_expenditure_to_assets': float(latest_cash[fixed_assets_purchase_field]) / float(latest_balance[total_assets_field]) if fixed_assets_purchase_field in latest_cash and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'capital_expenditure_to_equity': float(latest_cash[fixed_assets_purchase_field]) / float(latest_balance[total_equity_field]) if fixed_assets_purchase_field in latest_cash and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'capital_expenditure_to_market_cap': float(latest_cash[fixed_assets_purchase_field]) / market_cap if fixed_assets_purchase_field in latest_cash and market_cap > 0 else None,
-            'capital_expenditure_to_net_income': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[net_profit_field]) if fixed_assets_purchase_field in latest_cash and net_profit_field in latest_income and float(latest_income[net_profit_field]) > 0 else None,
-            'capital_expenditure_to_free_cash_flow': float(latest_cash[fixed_assets_purchase_field]) / (float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field])) if fixed_assets_purchase_field in latest_cash and net_operate_cash_flow_field in latest_cash and net_invest_cash_flow_field in latest_cash and (float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field])) > 0 else None,
-        }
-        
-        return pd.DataFrame([metrics])
-    except Exception as e:
-        print(f"Error fetching financial metrics for {ticker}: {str(e)}")
-        return pd.DataFrame()
 
-def search_line_items(ticker: str, end_date: str, period: str = "annual", limit: int = 5) -> dict:
-    """Search for specific line items in financial statements"""
+def get_financial_metrics(ticker: str, end_date: str, period: str = "annual", limit: int = 5) -> list[FinancialMetrics]:
     try:
-        # Convert ticker format (e.g., 600519.SH -> 600519)
         stock_code = ticker.split('.')[0]
-        
-        # Get financial reports from Akshare using Eastmoney APIs
-        income_statement = ak.stock_profit_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        balance_sheet = ak.stock_balance_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        cash_flow = ak.stock_cash_flow_sheet_by_report_em(symbol=f"{stock_code}.SH")
-        print("[DEBUG] income_statement columns:", income_statement.columns)
-        print("[DEBUG] income_statement head:\n", income_statement.head())
-        print("[DEBUG] balance_sheet columns:", balance_sheet.columns)
-        print("[DEBUG] balance_sheet head:\n", balance_sheet.head())
-        print("[DEBUG] cash_flow columns:", cash_flow.columns)
-        print("[DEBUG] cash_flow head:\n", cash_flow.head())
-        
-        if income_statement.empty or balance_sheet.empty or cash_flow.empty:
-            return {}
-        
-        # Get market cap
-        market_data = ak.stock_zh_a_spot_em()
-        stock_info = market_data[market_data['代码'] == stock_code]
+
+        # 获取财务报表
+        income = ak.stock_profit_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        balance = ak.stock_balance_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        cash = ak.stock_cash_flow_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        market_df = ak.stock_zh_a_spot_em()
+
+        if income.empty or balance.empty or cash.empty:
+            return []
+
+        latest_income = income.iloc[0]
+        latest_balance = balance.iloc[0]
+        latest_cash = cash.iloc[0]
+
+        stock_info = market_df[market_df['代码'] == stock_code]
         market_cap = float(stock_info['总市值'].iloc[0]) if not stock_info.empty else None
-        
-        # Get latest data
-        latest_income = income_statement.iloc[0]
-        latest_balance = balance_sheet.iloc[0]
-        latest_cash = cash_flow.iloc[0]
-        
-        # 自动识别字段名
-        sales_field = find_matching_field(income_statement, 'TOTAL_OPERATE_INCOME')
-        net_profit_field = find_matching_field(income_statement, 'NETPROFIT')
-        total_assets_field = find_matching_field(balance_sheet, 'TOTAL_ASSETS')
-        total_equity_field = find_matching_field(balance_sheet, 'TOTAL_EQUITY')
-        net_operate_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_OPERATE')
-        net_invest_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_INVEST')
-        net_finance_cash_flow_field = find_matching_field(cash_flow, 'NETCASH_FINANCE')
-        basic_eps_field = find_matching_field(income_statement, 'BASIC_EPS')
-        share_capital_field = find_matching_field(balance_sheet, 'SHARE_CAPITAL')
-        dividend_per_share_field = find_matching_field(income_statement, 'DIVIDEND_PER_SHARE')
-        operating_cost_field = find_matching_field(income_statement, 'TOTAL_OPERATE_COST')
-        inventory_field = find_matching_field(balance_sheet, 'INVENTORY')
-        accounts_receivable_field = find_matching_field(balance_sheet, 'ACCOUNTS_RECE')
-        accounts_payable_field = find_matching_field(balance_sheet, 'ACCOUNTS_PAYABLE')
-        operating_profit_field = find_matching_field(income_statement, 'OPERATE_PROFIT')
-        financial_expense_field = find_matching_field(income_statement, 'FINANCE_EXPENSE')
-        fixed_assets_field = find_matching_field(balance_sheet, 'FIXED_ASSET')
-        total_current_assets_field = find_matching_field(balance_sheet, 'TOTAL_CURRENT_ASSETS')
-        total_current_liabilities_field = find_matching_field(balance_sheet, 'TOTAL_CURRENT_LIAB')
-        retained_earnings_field = find_matching_field(balance_sheet, 'UNASSIGN_RPOFIT')
-        fixed_assets_purchase_field = find_matching_field(cash_flow, 'CONSTRUCT_LONG_ASSET')
-        depreciation_field = find_matching_field(income_statement, 'FA_IR_DEPR')
-        
-        print("\n[DEBUG] Field mappings:")
-        print(f"sales_field: {sales_field}")
-        print(f"net_profit_field: {net_profit_field}")
-        print(f"total_assets_field: {total_assets_field}")
-        print(f"total_equity_field: {total_equity_field}")
-        
-        # Map indicators to line items
-        line_items = {
-            'revenue': float(latest_income[sales_field]) if sales_field in latest_income else None,
-            'net_income': float(latest_income[net_profit_field]) if net_profit_field in latest_income else None,
-            'total_assets': float(latest_balance[total_assets_field]) if total_assets_field in latest_balance else None,
-            'total_equity': float(latest_balance[total_equity_field]) if total_equity_field in latest_balance else None,
-            'operating_cash_flow': float(latest_cash[net_operate_cash_flow_field]) if net_operate_cash_flow_field in latest_cash else None,
-            'investing_cash_flow': float(latest_cash[net_invest_cash_flow_field]) if net_invest_cash_flow_field in latest_cash else None,
-            'financing_cash_flow': float(latest_cash[net_finance_cash_flow_field]) if net_finance_cash_flow_field in latest_cash else None,
-            'free_cash_flow': float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field]) if net_operate_cash_flow_field in latest_cash and net_invest_cash_flow_field in latest_cash else None,
-            'eps': float(latest_income[basic_eps_field]) if basic_eps_field in latest_income else None,
-            'book_value': float(latest_balance[total_equity_field]) / float(latest_balance[share_capital_field]) if total_equity_field in latest_balance and share_capital_field in latest_balance and float(latest_balance[share_capital_field]) > 0 else None,
-            'dividend_yield': float(latest_income[dividend_per_share_field]) / float(latest_income[basic_eps_field]) if dividend_per_share_field in latest_income and basic_eps_field in latest_income and float(latest_income[basic_eps_field]) > 0 else None,
-            'asset_turnover': float(latest_income[sales_field]) / float(latest_balance[total_assets_field]) if sales_field in latest_income and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'inventory_turnover': float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field]) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else None,
-            'receivables_turnover': float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field]) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else None,
-            'days_sales_outstanding': 365 / (float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field])) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else None,
-            'days_inventory': 365 / (float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field])) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else None,
-            'days_payable': 365 / (float(latest_income[operating_cost_field]) / float(latest_balance[accounts_payable_field])) if operating_cost_field in latest_income and accounts_payable_field in latest_balance and float(latest_balance[accounts_payable_field]) > 0 else None,
-            'cash_conversion_cycle': (365 / (float(latest_income[sales_field]) / float(latest_balance[accounts_receivable_field])) if sales_field in latest_income and accounts_receivable_field in latest_balance and float(latest_balance[accounts_receivable_field]) > 0 else 0) + 
-                                   (365 / (float(latest_income[operating_cost_field]) / float(latest_balance[inventory_field])) if operating_cost_field in latest_income and inventory_field in latest_balance and float(latest_balance[inventory_field]) > 0 else 0) - 
-                                   (365 / (float(latest_income[operating_cost_field]) / float(latest_balance[accounts_payable_field])) if operating_cost_field in latest_income and accounts_payable_field in latest_balance and float(latest_balance[accounts_payable_field]) > 0 else 0),
-            'interest_coverage': float(latest_income[operating_profit_field]) / float(latest_income[financial_expense_field]) if operating_profit_field in latest_income and financial_expense_field in latest_income and float(latest_income[financial_expense_field]) > 0 else None,
-            'fixed_asset_turnover': float(latest_income[sales_field]) / float(latest_balance[fixed_assets_field]) if sales_field in latest_income and fixed_assets_field in latest_balance and float(latest_balance[fixed_assets_field]) > 0 else None,
-            'total_asset_turnover': float(latest_income[sales_field]) / float(latest_balance[total_assets_field]) if sales_field in latest_income and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'equity_turnover': float(latest_income[sales_field]) / float(latest_balance[total_equity_field]) if sales_field in latest_income and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'working_capital': float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field]) if total_current_assets_field in latest_balance and total_current_liabilities_field in latest_balance else None,
-            'working_capital_turnover': float(latest_income[sales_field]) / (float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field])) if sales_field in latest_income and total_current_assets_field in latest_balance and total_current_liabilities_field in latest_balance and (float(latest_balance[total_current_assets_field]) - float(latest_balance[total_current_liabilities_field])) > 0 else None,
-            'retained_earnings': float(latest_balance[retained_earnings_field]) if retained_earnings_field in latest_balance else None,
-            'retained_earnings_to_equity': float(latest_balance[retained_earnings_field]) / float(latest_balance[total_equity_field]) if retained_earnings_field in latest_balance and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'capital_expenditure': float(latest_cash[fixed_assets_purchase_field]) if fixed_assets_purchase_field in latest_cash else None,
-            'capital_expenditure_to_operating_cash_flow': float(latest_cash[fixed_assets_purchase_field]) / float(latest_cash[net_operate_cash_flow_field]) if fixed_assets_purchase_field in latest_cash and net_operate_cash_flow_field in latest_cash and float(latest_cash[net_operate_cash_flow_field]) > 0 else None,
-            'capital_expenditure_to_depreciation': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[depreciation_field]) if fixed_assets_purchase_field in latest_cash and depreciation_field in latest_income and float(latest_income[depreciation_field]) > 0 else None,
-            'capital_expenditure_to_revenue': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[sales_field]) if fixed_assets_purchase_field in latest_cash and sales_field in latest_income and float(latest_income[sales_field]) > 0 else None,
-            'capital_expenditure_to_assets': float(latest_cash[fixed_assets_purchase_field]) / float(latest_balance[total_assets_field]) if fixed_assets_purchase_field in latest_cash and total_assets_field in latest_balance and float(latest_balance[total_assets_field]) > 0 else None,
-            'capital_expenditure_to_equity': float(latest_cash[fixed_assets_purchase_field]) / float(latest_balance[total_equity_field]) if fixed_assets_purchase_field in latest_cash and total_equity_field in latest_balance and float(latest_balance[total_equity_field]) > 0 else None,
-            'capital_expenditure_to_market_cap': float(latest_cash[fixed_assets_purchase_field]) / market_cap if fixed_assets_purchase_field in latest_cash and market_cap > 0 else None,
-            'capital_expenditure_to_net_income': float(latest_cash[fixed_assets_purchase_field]) / float(latest_income[net_profit_field]) if fixed_assets_purchase_field in latest_cash and net_profit_field in latest_income and float(latest_income[net_profit_field]) > 0 else None,
-            'capital_expenditure_to_free_cash_flow': float(latest_cash[fixed_assets_purchase_field]) / (float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field])) if fixed_assets_purchase_field in latest_cash and net_operate_cash_flow_field in latest_cash and net_invest_cash_flow_field in latest_cash and (float(latest_cash[net_operate_cash_flow_field]) - float(latest_cash[net_invest_cash_flow_field])) > 0 else None,
+
+        # 安全字段提取函数
+        def safe(field, source):
+            return float(source[field]) if field in source and source[field] not in ('--', None) else None
+
+        def match(source, key):
+            # 简化版映射查找，建议你自定义字段对照
+            for col in source.keys():
+                if key.lower() in col.lower():
+                    return col
+            return None
+
+        # 基础字段提取
+        revenue = safe(match(income, '营业总收入'), latest_income)
+        net_profit = safe(match(income, '净利润'), latest_income)
+        gross_profit = safe(match(income, '营业总收入'), latest_income) - safe(match(income, '营业总成本'), latest_income)
+        gross_margin = gross_profit / revenue if revenue and gross_profit else None
+        net_margin = net_profit / revenue if net_profit and revenue else None
+        eps = safe(match(income, '基本每股收益'), latest_income)
+
+        total_equity = safe(match(balance, '所有者权益合计'), latest_balance)
+        total_assets = safe(match(balance, '资产总计'), latest_balance)
+        current_liabilities = safe(match(balance, '流动负债合计'), latest_balance)
+        cash_and_equivalents = safe(match(balance, '货币资金'), latest_balance)
+        total_liabilities = safe(match(balance, '负债合计'), latest_balance)
+        shares_outstanding = safe(match(balance, '股本'), latest_balance)
+        book_value_per_share = total_equity / shares_outstanding if total_equity and shares_outstanding else None
+        roe = net_profit / total_equity if net_profit and total_equity else None
+        roic = net_profit / (total_assets - current_liabilities) if net_profit and total_assets and current_liabilities else None
+        pe_ratio = market_cap / net_profit if market_cap and net_profit else None
+        pb_ratio = market_cap / (book_value_per_share * shares_outstanding) if market_cap and book_value_per_share and shares_outstanding else None
+
+        # Enterprise value 粗略估算
+        enterprise_value = market_cap + total_liabilities - cash_and_equivalents if market_cap and total_liabilities and cash_and_equivalents else None
+
+        # 自由现金流与收益率
+        fcf = safe(match(cash, '自由现金流'), latest_cash)
+        free_cash_flow_yield = fcf / market_cap if fcf and market_cap else None
+
+        # 构建 FinancialMetrics 字段
+        metrics = {
+            'ticker': ticker,
+            'report_period': end_date,
+            'period': period,
+            'currency': 'CNY',
+            'market_cap': market_cap,
+            'enterprise_value': enterprise_value,
+            'price_to_earnings_ratio': pe_ratio,
+            'price_to_book_ratio': pb_ratio,
+            'free_cash_flow_yield': free_cash_flow_yield,
+            'gross_margin': gross_margin,
+            'net_margin': net_margin,
+            'return_on_equity': roe,
+            'return_on_invested_capital': roic,
+            'earnings_per_share': eps,
+            'book_value_per_share': book_value_per_share,
+            'revenue': revenue,
+            'net_income': net_profit,
         }
-        
-        return line_items
+
+        full_data = {field: metrics.get(field, None) for field in FinancialMetrics.model_fields.keys()}
+        return [FinancialMetrics(**full_data)]
+
     except Exception as e:
-        print(f"Error searching line items for {ticker}: {str(e)}")
-        return {}
+        print(f"[ERROR] Failed to get financial metrics for {ticker}: {e}")
+        return []
+
+
+def search_line_items(
+    ticker: str,
+    line_items: list[str],
+    end_date: str,
+    period: str = "annual",
+    limit: int = 5,
+) -> list[LineItem]:
+    try:
+        stock_code = ticker.split('.')[0]
+
+        # 获取财报数据
+        income = ak.stock_profit_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        balance = ak.stock_balance_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        cash = ak.stock_cash_flow_sheet_by_report_em(symbol=f"{stock_code}.SH")
+        if income.empty or balance.empty or cash.empty:
+            return []
+
+        latest_income = income.iloc[0]
+        latest_balance = balance.iloc[0]
+        latest_cash = cash.iloc[0]
+
+        # 所有字段集中到一起便于查找
+        all_sources = [latest_income, latest_balance, latest_cash]
+
+        result_fields = {}
+
+        for item in line_items:
+            value_found = None
+            for df in all_sources:
+                match = find_matching_field(df.to_frame().T, item)
+                if match and match in df and df[match] not in ('--', None):
+                    try:
+                        value_found = float(df[match])
+                        break
+                    except:
+                        continue
+            result_fields[item] = value_found
+
+        return [
+            LineItem(
+                ticker=ticker,
+                report_period=end_date,
+                period=period,
+                currency="CNY",
+                **result_fields
+            )
+        ]
+    except Exception as e:
+        print(f"[ERROR] Failed to search line items for {ticker}: {e}")
+        return []
+
 
 def get_insider_trades(
     ticker: str,

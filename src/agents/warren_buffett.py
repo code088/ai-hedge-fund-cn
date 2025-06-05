@@ -7,6 +7,14 @@ from typing_extensions import Literal
 from src.tools.api_router import get_financial_metrics, get_market_cap, search_line_items
 from src.utils.llm import call_llm
 from src.utils.progress import progress
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('warren_buffett_agent')
 
 
 class WarrenBuffettSignal(BaseModel):
@@ -153,6 +161,8 @@ def warren_buffett_agent(state: AgentState):
 
 def analyze_fundamentals(metrics: list) -> dict[str, any]:
     """Analyze company fundamentals based on Buffett's criteria."""
+    logger.debug(f"analyze_fundamentals input metrics: {json.dumps([m.model_dump() for m in metrics], indent=2)}")
+    
     if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or len(metrics) == 0:
         return {"score": 0, "details": "Insufficient fundamental data"}
 
@@ -202,6 +212,8 @@ def analyze_fundamentals(metrics: list) -> dict[str, any]:
 
 def analyze_consistency(financial_line_items: list) -> dict[str, any]:
     """Analyze earnings consistency and growth."""
+    logger.debug(f"analyze_consistency input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    
     if len(financial_line_items) < 4:  # Need at least 4 periods for trend analysis
         return {"score": 0, "details": "Insufficient historical data"}
 
@@ -243,6 +255,8 @@ def analyze_moat(metrics: list) -> dict[str, any]:
     4. Brand strength (inferred from margins and consistency)
     5. Switching costs (inferred from customer retention)
     """
+    logger.debug(f"analyze_moat input metrics: {json.dumps([m.model_dump() for m in metrics], indent=2)}")
+    
     if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or len(metrics) < 5:  # Need more data for proper moat analysis
         return {"score": 0, "max_score": 5, "details": "Insufficient data for comprehensive moat analysis"}
 
@@ -338,6 +352,8 @@ def analyze_management_quality(financial_line_items: list) -> dict[str, any]:
         might be shareholder-friendly.
       - if there's a big new issuance, it might be a negative sign (dilution).
     """
+    logger.debug(f"analyze_management_quality input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    
     if not financial_line_items:
         return {"score": 0, "max_score": 2, "details": "Insufficient data for management analysis"}
 
@@ -376,6 +392,8 @@ def calculate_owner_earnings(financial_line_items: list) -> dict[str, any]:
     Enhanced methodology: Net Income + Depreciation/Amortization - Maintenance CapEx - Working Capital Changes
     Uses multi-period analysis for better maintenance capex estimation.
     """
+    logger.debug(f"calculate_owner_earnings input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    
     if not financial_line_items or len(financial_line_items) < 2:
         return {"owner_earnings": None, "details": ["Insufficient data for owner earnings calculation"]}
 
@@ -500,6 +518,8 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
     Calculate intrinsic value using enhanced DCF with owner earnings.
     Uses more sophisticated assumptions and conservative approach like Buffett.
     """
+    logger.debug(f"calculate_intrinsic_value input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    
     if not financial_line_items or len(financial_line_items) < 3:
         return {"intrinsic_value": None, "details": ["Insufficient data for reliable valuation"]}
 
@@ -617,6 +637,8 @@ def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
     Analyze book value per share growth - a key Buffett metric for long-term value creation.
     Buffett often talks about companies that compound book value over decades.
     """
+    logger.debug(f"analyze_book_value_growth input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    
     if len(financial_line_items) < 3:
         return {"score": 0, "details": "Insufficient data for book value analysis"}
     
@@ -679,6 +701,9 @@ def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str
     Analyze pricing power - Buffett's key indicator of a business moat.
     Looks at ability to raise prices without losing customers (margin expansion during inflation).
     """
+    logger.debug(f"analyze_pricing_power input financial_line_items: {json.dumps([item.model_dump() for item in financial_line_items], indent=2)}")
+    logger.debug(f"analyze_pricing_power input metrics: {json.dumps([m.model_dump() for m in metrics], indent=2)}")
+    
     if not financial_line_items or not metrics:
         return {"score": 0, "details": "Insufficient data for pricing power analysis"}
     
