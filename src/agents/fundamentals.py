@@ -27,7 +27,7 @@ def fundamentals_analyst_agent(state: AgentState):
             limit=10,
         )
 
-        if financial_metrics is None or financial_metrics.empty:
+        if financial_metrics is None or len(financial_metrics) == 0:
             progress.update_status("fundamentals_analyst_agent", ticker, "Failed: No financial metrics found")
             continue
 

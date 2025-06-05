@@ -11,7 +11,18 @@ def sort_agent_signals(signals):
     analyst_order = {display: idx for idx, (display, _) in enumerate(ANALYST_ORDER)}
     analyst_order["Risk Management"] = len(ANALYST_ORDER)  # Add Risk Management at the end
 
-    return sorted(signals, key=lambda x: analyst_order.get(x[0], 999))
+    # 确保每个信号都有正确的列数
+    def validate_signal(signal):
+        if len(signal) != 4:  # 应该有4列：Agent, Signal, Confidence, Reasoning
+            print(f"[WARNING] Invalid signal format: {signal}")
+            return False
+        return True
+
+    # 过滤掉无效的信号
+    valid_signals = [signal for signal in signals if validate_signal(signal)]
+    
+    # 按预定义顺序排序
+    return sorted(valid_signals, key=lambda x: analyst_order.get(x[0], 999))
 
 
 def print_trading_output(result: dict) -> None:
@@ -86,17 +97,22 @@ def print_trading_output(result: dict) -> None:
                 
                 reasoning_str = wrapped_reasoning
 
-            table_data.append(
-                [
-                    f"{Fore.CYAN}{agent_name}{Style.RESET_ALL}",
-                    f"{signal_color}{signal_type}{Style.RESET_ALL}",
-                    f"{Fore.WHITE}{confidence}%{Style.RESET_ALL}",
-                    f"{Fore.WHITE}{reasoning_str}{Style.RESET_ALL}",
-                ]
-            )
+            # 确保每个行都有4个元素
+            row = [
+                f"{Fore.CYAN}{agent_name}{Style.RESET_ALL}",
+                f"{signal_color}{signal_type}{Style.RESET_ALL}",
+                f"{Fore.WHITE}{confidence}%{Style.RESET_ALL}",
+                f"{Fore.WHITE}{reasoning_str}{Style.RESET_ALL}",
+            ]
+            table_data.append(row)
 
         # Sort the signals according to the predefined order
         table_data = sort_agent_signals(table_data)
+
+        # 确保表格数据不为空
+        if not table_data:
+            print(f"\n{Fore.YELLOW}No analysis data available for {ticker}{Style.RESET_ALL}")
+            continue
 
         print(f"\n{Fore.WHITE}{Style.BRIGHT}AGENT ANALYSIS:{Style.RESET_ALL} [{Fore.CYAN}{ticker}{Style.RESET_ALL}]")
         print(
@@ -104,7 +120,7 @@ def print_trading_output(result: dict) -> None:
                 table_data,
                 headers=[f"{Fore.WHITE}Agent", "Signal", "Confidence", "Reasoning"],
                 tablefmt="grid",
-                colalign=("left", "center", "right", "left"),
+                colalign=["left", "center", "right", "left"],
             )
         )
 
@@ -188,7 +204,7 @@ def print_trading_output(result: dict) -> None:
             portfolio_data,
             headers=headers,
             tablefmt="grid",
-            colalign=("left", "center", "right", "right"),
+            colalign=["left", "center", "right", "right"],
         )
     )
     

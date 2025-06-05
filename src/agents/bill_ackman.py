@@ -135,7 +135,7 @@ def bill_ackman_agent(state: AgentState):
 
 def analyze_business_quality(metrics: list, financial_line_items: list) -> dict[str, any]:
     """Analyze business quality using Bill Ackman's criteria."""
-    if metrics is None or (hasattr(metrics, 'empty') and metrics.empty) or not financial_line_items:
+    if not metrics or not financial_line_items:
         return {"score": 0, "max_score": 3, "details": "Insufficient data for business quality analysis"}
     
     score = 0
@@ -183,25 +183,22 @@ def analyze_business_quality(metrics: list, financial_line_items: list) -> dict[
         details.append("No free cash flow data across periods.")
     
     # 3. Return on Equity (ROE) check from the latest metrics
-    latest_metrics = metrics[0]
-    if latest_metrics.return_on_equity and latest_metrics.return_on_equity > 0.15:
-        score += 2
-        details.append(f"High ROE of {latest_metrics.return_on_equity:.1%}, indicating a competitive advantage.")
-    elif latest_metrics.return_on_equity:
-        details.append(f"ROE of {latest_metrics.return_on_equity:.1%} is moderate.")
+    if metrics and len(metrics) > 0:
+        latest_metrics = metrics[0]
+        if latest_metrics.return_on_equity and latest_metrics.return_on_equity > 0.15:
+            score += 2
+            details.append(f"High ROE of {latest_metrics.return_on_equity:.1%}, indicating a competitive advantage.")
+        elif latest_metrics.return_on_equity:
+            details.append(f"ROE of {latest_metrics.return_on_equity:.1%} is moderate.")
+        else:
+            details.append("ROE data not available.")
     else:
-        details.append("ROE data not available.")
-    
-    # 4. (Optional) Brand Intangible (if intangible_assets are fetched)
-    # intangible_vals = [item.intangible_assets for item in financial_line_items if item.intangible_assets]
-    # if intangible_vals and sum(intangible_vals) > 0:
-    #     details.append("Significant intangible assets may indicate brand value or proprietary tech.")
-    #     score += 1
+        details.append("No metrics data available for ROE analysis.")
     
     return {
         "score": score,
         "max_score": 3,
-        "details": "; ".join(details)
+        "details": " | ".join(details)
     }
 
 
