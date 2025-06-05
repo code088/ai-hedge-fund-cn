@@ -239,31 +239,63 @@ For any other ticker, you will need to set the `FINANCIAL_DATASETS_API_KEY` in t
 
 #### 使用 Poetry
 ```bash
+# 美股示例
 poetry run python src/main.py --ticker AAPL,MSFT,NVDA
+
+# 中国A股示例
+poetry run python src/main.py --ticker 600519.SH,000858.SZ,601318.SH
 ```
 
 #### With Poetry
 ```bash
+# US stocks example
 poetry run python src/main.py --ticker AAPL,MSFT,NVDA
+
+# Chinese A-shares example
+poetry run python src/main.py --ticker 600519.SH,000858.SZ,601318.SH
 ```
 
 #### 使用 Docker
 ```bash
 # Linux/Mac：
+# 美股示例
 ./run.sh --ticker AAPL,MSFT,NVDA main
 
+# 中国A股示例
+./run.sh --ticker 600519.SH,000858.SZ,601318.SH main
+
 # Windows：
+# 美股示例
 run.bat --ticker AAPL,MSFT,NVDA main
+
+# 中国A股示例
+run.bat --ticker 600519.SH,000858.SZ,601318.SH main
 ```
 
 #### With Docker
 ```bash
 # On Linux/Mac:
+# US stocks example
 ./run.sh --ticker AAPL,MSFT,NVDA main
 
+# Chinese A-shares example
+./run.sh --ticker 600519.SH,000858.SZ,601318.SH main
+
 # On Windows:
+# US stocks example
 run.bat --ticker AAPL,MSFT,NVDA main
+
+# Chinese A-shares example
+run.bat --ticker 600519.SH,000858.SZ,601318.SH main
 ```
+
+**注意**：对于中国A股，股票代码需要包含交易所后缀：
+- `.SH` 表示上海证券交易所
+- `.SZ` 表示深圳证券交易所
+
+**Note**: For Chinese A-shares, the ticker symbol needs to include the exchange suffix:
+- `.SH` for Shanghai Stock Exchange
+- `.SZ` for Shenzhen Stock Exchange
 
 **示例输出：**
 <img width="992" alt="Screenshot 2025-01-06 at 5 50 17 PM" src="https://github.com/user-attachments/assets/e8ca04bf-9989-4a7d-a8b4-34e04666663b" />
